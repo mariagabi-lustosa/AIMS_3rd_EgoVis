@@ -124,15 +124,15 @@ MODEL_DIR = Path("/work/your.user/sta/Cosmos-Tokenizer/pretrained_ckpts")
 
 This script will:
 - Load Ego4D videos
-- Extract 16 context frames around each query frame (stride=2)
+- Extract context frames around each query frame
 - Process frames through Cosmos Tokenizer
-- Apply spatial pooling to get compact temporal features [16, 3]
+- Apply spatial pooling to get compact temporal features
 - Save features as `.pt` files in the cache directory
 
 **Features format:**
 ```python
 cosmos_features: torch.Tensor  # Shape: [16, 3] per sample
-# 16 temporal frames, 3 feature dimensions (spatially pooled)
+# 16 temporal frames, 3 feature dimensions
 ```
 
 ### Step 2: Training with SigLIP + Cosmos
