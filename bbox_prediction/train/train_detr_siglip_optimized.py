@@ -16,7 +16,6 @@ from sta.bbox_prediction.read_data.transform import SiglipFrameTransform
 
 
 def get_cosine_schedule_with_warmup(optimizer, num_warmup_steps, num_training_steps, min_lr_ratio=0.01):
-    """Creates a learning rate scheduler with linear warmup and cosine decay."""
     def lr_lambda(current_step):
         if current_step < num_warmup_steps:
             return float(current_step) / float(max(1, num_warmup_steps))
