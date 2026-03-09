@@ -1,6 +1,14 @@
-# STA - Short-Term Anticipation with DETR and SigLIP
+# Short-Term Object Interaction Anticipation with DETR, SigLIP and Cosmos Tokenizer
 
-This project implements an object detection and short-term anticipation system using DETR (Detection Transformer) with SigLIP backbone for the Ego4D dataset.
+This project implements a short-term anticipation (STA) system for object detection using DETR (Detection Transformer) with SigLIP backbone and Cosmos Tokenizer for temporal context encoding on the Ego4D dataset.
+
+## Architecture Overview
+
+The system combines visual and temporal features to predict future object bounding boxes and classes:
+
+1. **SigLIP Query Encoder**: Extracts visual features from the query frame
+2. **Cosmos Tokenizer**: Encodes context frames into temporal features
+3. **DETR Decoder**: Fuses both feature streams to predict bounding boxes and object classes
 
 
 ## Installation
@@ -8,18 +16,18 @@ This project implements an object detection and short-term anticipation system u
 ### 1. Clone the repository
 
 ```bash
-git clone <your-repository>
-cd sta
+git clone https://github.com/mariagabi-lustosa/AIMS_3rd_EgoVis.git
+cd AIMS_3rd_EgoVis
 ```
 
 ### 2. Create a virtual environment
 
 ```bash
 python -m venv venv
-source venv/bin/activate  # Linux/Mac
+source venv/bin/activate
 # or
-conda create -m venv
-conda activate venv
+conda create -n sta
+conda activate sta
 ```
 
 ### 3. Install dependencies
@@ -31,19 +39,41 @@ pip install -r requirements.txt
 
 ### 4. Set up Cosmos Tokenizer
 
-NVIDIA's Cosmos Tokenizer is included as a submodule. To install it:
-
 ```bash
+# Clone the Cosmos Tokenizer repository
+git clone https://github.com/NVIDIA/Cosmos-Tokenizer.git
 cd Cosmos-Tokenizer
+
+# Install git-lfs and download models
+git lfs install
+git lfs pull
+
+# Install the package
 pip install -e .
 cd ..
+```
+
+**Download pre-trained Cosmos models:**
+
+```python
+from huggingface_hub import login, snapshot_download
+
+# Login to HuggingFace (you'll need a token)
+login()
+
+# Download the Cosmos model
+model_name = "Cosmos-Tokenizer-DV8x8x8"
+snapshot_download(
+    repo_id=f"nvidia/{model_name}", 
+    local_dir=f"Cosmos-Tokenizer/pretrained_ckpts/{model_name}"
+)
 ```
 
 ## Dataset Configuration
 
 ### Expected Data Structure
 
-The project expects the Ego4D dataset to be organized as follows:
+The project expects the Ego4D dataset organized as follows:
 
 ```
 /hadatasets/ego4d_data/v1/
@@ -63,131 +93,125 @@ The project expects the Ego4D dataset to be organized as follows:
 
 ### Path Configuration
 
-Data paths are configured in the training scripts. You can modify them in:
+Configure data paths in the training scripts:
 
 - `bbox_prediction/train/train_detr_siglip.py`
 - `bbox_prediction/train/train_detr_siglip_optimized.py`
-
-Change the following lines to point to your data:
+- `bbox_prediction/cosmos/cosmos_tokenizer.py`
 
 ```python
 sta_json = Path("/hadatasets/ego4d_data/v1/annotations/fho_sta_train.json")
 full_scale_dir = Path("/hadatasets/ego4d_data/v1/video_540ss")
 ```
 
-## Usage
+## Complete Usage Pipeline
 
-### Training
+### Step 1: Pre-compute Cosmos Features
 
-#### DETR + SigLIP Training (Optimized)
-
-Run the optimized training script:
+The Cosmos Tokenizer processes 16 context frames around each query frame. Pre-compute these features before training:
 
 ```bash
-python -m sta.bbox_prediction.train.train_detr_siglip_optimized
+python -m sta.bbox_prediction.cosmos.cosmos_tokenizer
 ```
 
-This script includes:
-- Mixed precision training (FP16)
-- Gradient accumulation
-- Cosine learning rate schedule with warmup
-- TensorBoard logging
+**Configuration in `cosmos_tokenizer.py`:**
+```python
+CACHE_DIR = Path("/your/path/cosmos_cache_sta_train")
+STA_JSON = Path("/hadatasets/ego4d_data/v1/annotations/fho_sta_train.json")
+FULL_SCALE_DIR = Path("/hadatasets/ego4d_data/v1/video_540ss")
+MODEL_DIR = Path("/work/your.user/sta/Cosmos-Tokenizer/pretrained_ckpts")
+```
 
-#### DETR + SigLIP Training (Basic version)
+This script will:
+- Load Ego4D videos
+- Extract 16 context frames around each query frame (stride=2)
+- Process frames through Cosmos Tokenizer
+- Apply spatial pooling to get compact temporal features [16, 3]
+- Save features as `.pt` files in the cache directory
+
+**Features format:**
+```python
+cosmos_features: torch.Tensor  # Shape: [16, 3] per sample
+# 16 temporal frames, 3 feature dimensions (spatially pooled)
+```
+
+### Step 2: Training with SigLIP + Cosmos
+
+Train the complete model with both visual (SigLIP) and temporal (Cosmos) features:
 
 ```bash
 python -m sta.bbox_prediction.train.train_detr_siglip
 ```
 
-### Training Parameters
+**Configure the dataset to use Cosmos features:**
 
-You can adjust the following hyperparameters in the training scripts:
+In `train_detr_siglip.py`:
+```python
+# Uncomment line ~33 to enable Cosmos features
+ds = STANounDetectionDataset(
+    paths, 
+    transform_query=tf, 
+    min_box_size=1, 
+    keep_metadata=False, 
+    cosmos_cache_dir=Path("/your/path/cosmos_cache_sta_train")
+)
 
-- `BATCH_SIZE`: Batch size (default: 16)
-- `NUM_WORKERS`: Number of DataLoader workers (default: 4)
-- `NUM_EPOCHS`: Number of epochs (default: 20)
-- `LEARNING_RATE`: Initial learning rate (default: 1e-4)
-- `GRADIENT_ACCUMULATION_STEPS`: Gradient accumulation steps (default: 2)
-
-### Monitoring with TensorBoard
-
-During training, metrics are automatically saved. To visualize them:
-
-```bash
-tensorboard --logdir=../runs
+# Uncomment line ~36 to use SiglipCosmosDETR model
+model = SiglipCosmosDETR(
+    siglip_name=model_name, 
+    num_classes=num_nouns, 
+    num_queries=50, 
+    train_backbone=False
+)
 ```
 
-Access http://localhost:6006 in your browser.
 
-### Evaluation and Visualization
+
+### Step 3: Monitor Training with TensorBoard
+
+Training metrics are automatically logged:
+
+```bash
+tensorboard --logdir=runs
+```
+
+Access http://localhost:6006 to visualize:
+- Total loss
+- Classification loss
+- Bounding box L1 loss
+- GIoU loss
+- Learning rate schedule
+
+### Step 4: Evaluation and Visualization
 
 #### Visualize Predictions
+
+View model predictions on test samples:
 
 ```bash
 python -m sta.bbox_prediction.eval.view_nouns_debug
 ```
 
+**Configure checkpoint path:**
+```python
+ckpt = Path("checkpoints/detr_siglip_cosmos_best.pt")
+```
+
+This script:
+- Loads a trained checkpoint
+- Processes test samples
+- Displays predicted vs. ground truth bounding boxes
+- Shows object class labels
+
 #### Plot Training Logs
+
+Analyze training progression:
 
 ```bash
 python -m sta.bbox_prediction.eval.plot_training_log
 ```
 
-#### Dataset Sanity Check
-
-```bash
-python -m sta.bbox_prediction.eval.sanity_check
-```
-
-## Models
-
-### Available Architectures
-
-1. **SiglipDETR**: DETR with SigLIP base backbone
-   - Vision encoder: `google/siglip-base-patch16-224`
-   - Decoder: 6-layer transformer
-   - Queries: 50 object queries
-
-2. **SiglipCosmosDETR**: DETR with SigLIP + Cosmos Tokenizer
-   - Includes Cosmos features for temporal representation
-
-### Components
-
-- **SiglipQueryEncoder**: Query frame encoder using SigLIP
-- **SetCriterion**: Loss function for DETR training
-- **HungarianMatcher**: Bipartite matching between predictions and ground truth
-
-## Outputs
-
-### Checkpoints
-
-Checkpoints are saved in `../checkpoints/` with the following format:
-- `detr_siglip_optimized_epoch{N}.pt`: Checkpoint for each epoch
-- `detr_siglip_optimized_best.pt`: Best model (lowest loss)
-
-### Logs
-
-- JSON logs: `../runs/train_log_optimized_{N}.jsonl`
-- TensorBoard: `../runs/detr_siglip_optimized/`
-
-## Output Data Structure
-
-### Prediction Format
-
-```python
-{
-    'pred_logits': torch.Tensor,  # [B, num_queries, num_classes+1]
-    'pred_boxes': torch.Tensor,   # [B, num_queries, 4] (cx, cy, w, h) normalized
-}
-```
-
-### Ground Truth Format
-
-```python
-{
-    'labels': torch.Tensor,  # [num_boxes] class indices
-    'boxes': torch.Tensor,   # [num_boxes, 4] (cx, cy, w, h) normalized
-}
-```
-# AIMS_3rd_EgoVis
-# AIMS_3rd_EgoVis
+Generates plots for:
+- Loss curves over epochs
+- Learning dynamics
+- Convergence analysis
