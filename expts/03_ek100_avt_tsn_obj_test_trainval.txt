@@ -44,7 +44,7 @@ dataset_train.conv_to_anticipate_fn.tau_o=10
 dataset_eval.conv_to_anticipate_fn.tau_a=1
 dataset_eval.conv_to_anticipate_fn.tau_o=10
 dataset.epic_kitchens100.common.label_type=action
-+dataset_train.reader_fn={_target_: datasets.epic_kitchens.EpicRULSTMFeatsReader, lmdb_path: ${dataset.epic_kitchens100.common.rulstm_feats_dir}/obj/, read_type: normal}
++dataset_train.reader_fn={_target_: datasets.epic_kitchens.EpicRULSTMFeatsReader, lmdb_path: ${dataset.epic_kitchens100.common.rulstm_feats_dir}/obj_full/, read_type: normal}
 +dataset_eval.reader_fn=${dataset_train.reader_fn}
 
 +dataset_train.conv_to_anticipate_fn.drop_style=correct

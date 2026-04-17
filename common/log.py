@@ -7,6 +7,10 @@ import logging
 
 import torch
 import torch.distributed as dist
+import wandb
+from common.wandb_writer import WandbWriter
+import datetime
+from omegaconf import OmegaConf
 
 from common.utils import is_dist_avail_and_initialized, is_main_process
 __all__ = [
@@ -213,6 +217,57 @@ class MetricLogger(object):
             self.writer.add_text(
                 f"{self.tbd_header}epoch/{self.metric_set}_totaltime",
                 total_time_string, self.epoch)
+
+
+'''def setup_wandb(project_name="action-antecipation-experiments"):
+    if not is_main_process():
+        return None
+
+    wandb.init(project=project_name)
+    return WandbWriter()'''
+
+def setup_wandb(cfg=None, project_name="action-antecipation-experiments"):
+    #if not is_main_process():
+    #    return None
+
+    # 🔹 converter Hydra config → dict
+    config_dict = {}
+    if cfg is not None:
+        config_dict = OmegaConf.to_container(cfg, resolve=True)
+
+    # 🔹 pegar nome do modelo
+    model_name = "model"
+    try:
+        model_name = cfg.model.backbone['model_type']
+    except:
+        pass
+
+    # 🔹 timestamp
+    now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+    # 🔹 nome do run
+    run_name = f"{model_name}_{now}"
+
+    # 🔹 tags automáticas (baseadas no config)
+    tags = [
+        "AVT",
+        "EPIC-KITCHENS-100",
+        "BASELINE-AVT"
+    ]
+
+    # 🔹 descrição automática
+    notes = f"Treinamento do baseline (AVT)"
+
+    wandb.init(
+        project=project_name,
+        name=run_name,
+        tags=tags,
+        notes=notes,
+        config=config_dict,
+        save_code=False
+    )
+
+    return WandbWriter()
 
 
 def setup_tbx(save_dir, SummaryWriter):

@@ -6,9 +6,12 @@ __pycache__
 .ropeproject
 .nfs*
 .vscode
+.idea/
 *.egg-info/
 *.pyc
 *.mypy_cache
+train.log*
+submission.json
 
 # Data directories
 DATA

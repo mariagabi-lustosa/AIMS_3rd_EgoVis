@@ -29,7 +29,7 @@ dataset_eval.sample_strategy=last_clip
 dataset_train.conv_to_anticipate_fn.tau_o=2.5
 dataset_eval.conv_to_anticipate_fn.tau_o=2.5
 dataset.epic_kitchens100.common.label_type=action
-+dataset_train.reader_fn={_target_: datasets.epic_kitchens.EpicRULSTMFeatsReader, lmdb_path: ${dataset.epic_kitchens100.common.rulstm_feats_dir}/rgb/, read_type: exact_rulstm}
++dataset_train.reader_fn={_target_: datasets.epic_kitchens.EpicRULSTMFeatsReader, lmdb_path: ${dataset.epic_kitchens100.common.rulstm_feats_dir}/rgb_full/, read_type: exact_rulstm}
 +dataset_eval.reader_fn=${dataset_train.reader_fn}
 
 # RULSTM data

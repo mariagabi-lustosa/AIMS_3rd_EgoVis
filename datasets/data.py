@@ -16,6 +16,9 @@ __all__ = [
 
 
 def get_dataset(dataset_cfg, data_cfg, transform, logger):
+
+    print(f"LENDO OS DADOS DO DATASET: {dataset_cfg}")
+    print(f"LENDO DATA DO DATASET: {data_cfg}")
     # If there is _precomputed_metadata file passed in, load that in
     kwargs = {}
     precomp_metadata_fpath = None

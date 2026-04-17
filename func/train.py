@@ -20,7 +20,7 @@ import numpy as np
 # it's giving a segmentation fault
 # https://github.com/pytorch/pytorch/issues/30651
 # Needs to imported before torchvision it seems
-from torch.utils.tensorboard import SummaryWriter
+#from torch.utils.tensorboard import SummaryWriter
 import torch
 import torch.utils.data
 from torch.utils.data.dataloader import default_collate
@@ -36,7 +36,7 @@ from omegaconf import OmegaConf
 
 from models import base_model
 from common import scheduler, utils, transforms as T
-from common.log import MetricLogger, setup_tbx, get_default_loggers
+from common.log import MetricLogger, setup_tbx, setup_wandb, get_default_loggers
 from datasets.data import get_dataset
 from notebooks import utils as nb_utils
 
@@ -79,8 +79,8 @@ def _store_video_logs(data, key, step_id, print_large_freq, metric_logger):
     Args:
         data[key] -> video (B, #clips, 3, T, H, W)
     """
-    if metric_logger.writer is None:
-        return
+    #if metric_logger.writer is None:
+    #    return
     if step_id % print_large_freq != 0:
         return
     if key not in data:
@@ -103,8 +103,8 @@ def _store_video_logs(data, key, step_id, print_large_freq, metric_logger):
 
 
 def _store_scalar_logs(name, val, step_id, print_freq, metric_logger):
-    if metric_logger.writer is None:
-        return
+    #if metric_logger.writer is None:
+    #    return
     if step_id % print_freq != 0:
         return
     metric_logger.writer.add_scalar(name, val, step_id)
@@ -333,6 +333,7 @@ def evaluate(
             features are extracted and won't compute final numbers etc. So
             it will never try to sync processes etc, which leads to crashes.
     """
+
     all_metric_loggers = {}
     final_accuracies = {}
     for data_key, data_loader in data_loaders.items():
@@ -450,7 +451,8 @@ def initial_setup(cfg, logger):
     device = torch.device('cuda')
 
     torch.backends.cudnn.benchmark = True
-    writer = setup_tbx('logs/', SummaryWriter)
+    #writer = setup_tbx('logs/', SummaryWriter)
+    writer = setup_wandb(cfg)
     return dist_info, device, writer
 
 
@@ -463,6 +465,7 @@ def init_model(model, ckpt_path, modules_to_keep, logger):
     """
     logger.debug('Initing %s with ckpt path: %s, using modules in it %s',
                  model, ckpt_path, modules_to_keep)
+
     checkpoint = torch.load(ckpt_path, map_location="cpu")
     if 'model' in checkpoint.keys():
         state_dict = checkpoint['model']

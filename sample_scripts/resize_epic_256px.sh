@@ -1,8 +1,8 @@
 # Copyright (c) Facebook, Inc. and its affiliates.
 
 #!/bin/bash
-indir="/path/to/orig/videos/"
-outdir="/path/to/resulting/videos_ht256px/"
+indir="/media/storage/alana/AVT/DATA/videos/EpicKitchens/videos"
+outdir="/media/storage/alana/AVT/DATA/videos/EpicKitchens/videos_ht256px"
 
 cd $indir
 videos=$(find . -iname *.MP4)
