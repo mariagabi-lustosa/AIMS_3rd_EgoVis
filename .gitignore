@@ -13,6 +13,7 @@ __pycache__
 train.log*
 submission.json
 
+
 # Data directories
 DATA
 OUTPUTS
@@ -22,4 +23,8 @@ OUTPUTS
 *.ipynb_checkpoints
 
 # other codebases
-external/rulstm
+wandb
+.codex/
+.gitmodules
+.yapfignore
+.style.yapf
