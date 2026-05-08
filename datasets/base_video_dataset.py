@@ -639,7 +639,10 @@ class BaseVideoDataset(torch.utils.data.Dataset):
     def _get_video(self, df_row):
         # While we only need the absolute path for certain reader_fns, worth
         # doing it for all since some might still need it to read fps etc.
-        video_path = get_abs_path(self.root, df_row['video_path'])
+        if getattr(self.reader_fn, 'needs_video_path', True):
+            video_path = get_abs_path(self.root, df_row['video_path'])
+        else:
+            video_path = Path(df_row['video_path'])
         fps = self.reader_fn.get_frame_rate(video_path)
         video_dict = {}
         (video, video_frame_sec, video_without_fps_subsample,

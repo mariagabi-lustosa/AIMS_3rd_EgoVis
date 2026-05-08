@@ -392,6 +392,8 @@ class EPICKitchens(BaseVideoDataset):
 
 
 class EpicRULSTMFeatsReader(Reader):
+    needs_video_path = False
+
     def __init__(self,
                  lmdb_path: Union[Path, List[Path]] = None,
                  read_type: str = 'exact_rulstm',

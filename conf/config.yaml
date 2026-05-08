@@ -9,7 +9,35 @@ cwd: ${hydra:runtime.cwd}
 
 sync_bn: false
 
+ddp_find_unused_parameters: false
+
 test_only: false
+
+wandb:
+  enabled: true
+  project_name: action-antecipation-experiments
+  entity: null
+  run_name: null
+  group: null
+  tags: []
+  notes: null
+  save_code: false
+  auto_resume: true
+  resume_id: null
+  id_file: wandb_run.json
+  log_videos: false
+  log_dataset_stats: true
+  dataset_topk: 20
+
+post_train:
+  run_test_submission: false
+  use_best_checkpoint: true
+  log_test_artifact: true
+  dataset_cfg_key: dataset_test
+  results_suffix: _test
+  submission:
+    sls: [1, 4, 4]
+    checkpoints: null  # null keeps use_best_checkpoint behavior; e.g. [best, final]
 
 # Set this to force data parallel training. Num nodes should be 1.
 data_parallel: false
@@ -43,6 +71,7 @@ train:
     _target_: func.train.train_one_epoch
     print_freq: 10
     print_large_freq: 1000  # How often to write images/videos summary
+    log_videos: ${wandb.log_videos}
     grad_clip_params: ${opt.grad_clip}  # DO NOT CHANGE HERE, change in opt
     # Set the following to store models every so many epochs. By default
     # will only store the last checkpoint and the best checkpoint.

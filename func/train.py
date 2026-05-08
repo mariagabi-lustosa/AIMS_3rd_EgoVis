@@ -13,6 +13,9 @@ import operator
 import psutil
 import h5py
 import subprocess
+import shutil
+import zipfile
+from collections import OrderedDict
 
 from tqdm import tqdm
 import numpy as np
@@ -39,6 +42,7 @@ from common import scheduler, utils, transforms as T
 from common.log import MetricLogger, setup_tbx, setup_wandb, get_default_loggers
 from datasets.data import get_dataset
 from notebooks import utils as nb_utils
+import wandb
 
 
 __all__ = ['main', 'evaluate', 'train_one_epoch', 'initial_setup']
@@ -46,11 +50,12 @@ RESULTS_SAVE_DIR = 'results'  # Don't put a "/" at the end, will add later
 CKPT_FNAME = 'checkpoint.pth'
 DATASET_TRAIN_CFG_KEY = 'dataset_train'
 DATASET_EVAL_CFG_KEY = 'dataset_eval'
+DATASET_TEST_CFG_KEY = 'dataset_test'
 STR_UID_MAXLEN = 64  # Max length of the string UID stored in H5PY
 
 
 def store_checkpoint(fpaths: Union[str, Sequence[str]], model, optimizer,
-                     lr_scheduler, epoch):
+                     lr_scheduler, epoch, extra_state=None):
     """
     Args:
         fpaths: List of paths or a single path, where to store.
@@ -67,6 +72,8 @@ def store_checkpoint(fpaths: Union[str, Sequence[str]], model, optimizer,
         "lr_scheduler": lr_scheduler.state_dict(),
         "epoch": epoch,
     }
+    if extra_state is not None:
+        checkpoint.update(extra_state)
     if not isinstance(fpaths, list):
         fpaths = [fpaths]
     for fpath in fpaths:
@@ -79,8 +86,8 @@ def _store_video_logs(data, key, step_id, print_large_freq, metric_logger):
     Args:
         data[key] -> video (B, #clips, 3, T, H, W)
     """
-    #if metric_logger.writer is None:
-    #    return
+    if metric_logger.writer is None:
+        return
     if step_id % print_large_freq != 0:
         return
     if key not in data:
@@ -103,8 +110,8 @@ def _store_video_logs(data, key, step_id, print_large_freq, metric_logger):
 
 
 def _store_scalar_logs(name, val, step_id, print_freq, metric_logger):
-    #if metric_logger.writer is None:
-    #    return
+    if metric_logger.writer is None:
+        return
     if step_id % print_freq != 0:
         return
     metric_logger.writer.add_scalar(name, val, step_id)
@@ -113,6 +120,248 @@ def _store_scalar_logs(name, val, step_id, print_freq, metric_logger):
 def _get_memory_usage_gb():
     mem = psutil.virtual_memory()
     return mem.used / (1024**3)
+
+
+def _softmax_np(logits):
+    logits = logits - np.max(logits, axis=-1, keepdims=True)
+    exps = np.exp(logits)
+    return exps / np.sum(exps, axis=-1, keepdims=True)
+
+
+def _read_results_dir(results_dir):
+    data = next(nb_utils.gen_load_resfiles(results_dir))
+    res_per_layer = {key: OrderedDict() for key in data if key not in ['epoch']}
+    for data in nb_utils.gen_load_resfiles(results_dir):
+        for i, idx in enumerate(data['idx']):
+            idx = int(idx)
+            for key in res_per_layer:
+                if idx not in res_per_layer[key]:
+                    res_per_layer[key][idx] = []
+                res_per_layer[key][idx].append(data[key][i])
+    final_res = {}
+    for key in res_per_layer:
+        if len(res_per_layer[key]) == 0:
+            continue
+        max_idx = max(res_per_layer[key].keys())
+        key_output = np.zeros([max_idx + 1] +
+                              list(res_per_layer[key][0][0].shape))
+        for idx in res_per_layer[key]:
+            key_output[idx] = np.mean(np.stack(res_per_layer[key][idx]), axis=0)
+        final_res[key] = key_output
+    return final_res
+
+
+def _log_dataset_stats(dataset, split_name, topk=20):
+    if wandb.run is None:
+        return
+    datasets = dataset.datasets if isinstance(dataset, torch.utils.data.ConcatDataset) else [dataset]
+    for dset_id, dset in enumerate(datasets):
+        prefix = f'dataset_stats/{split_name}'
+        if len(datasets) > 1:
+            prefix += f'/{dset_id}'
+        stats = {
+            f'{prefix}/num_samples': len(dset),
+            f'{prefix}/num_discarded': len(dset.discarded_df)
+            if getattr(dset, 'discarded_df', None) is not None else 0,
+            f'{prefix}/frame_rate': getattr(dset, 'frame_rate', float('nan')),
+            f'{prefix}/frames_per_clip': getattr(dset, 'frames_per_clip', float('nan')),
+        }
+        df = getattr(dset, 'df', None)
+        if df is not None:
+            for col in ['participant_id', 'video_id', 'uid', 'narration_id']:
+                if col in df.columns:
+                    stats[f'{prefix}/num_unique_{col}'] = int(df[col].nunique())
+            if {'start', 'end'}.issubset(df.columns):
+                durations = (df['end'] - df['start']).to_numpy()
+                stats[f'{prefix}/clip_duration_mean_sec'] = float(np.mean(durations))
+                stats[f'{prefix}/clip_duration_median_sec'] = float(np.median(durations))
+        wandb.log(stats)
+
+        for label_name, class_names in dset.classes.items():
+            counts = dict(dset.classes_counts.get(label_name, {}))
+            rows = []
+            for class_name, class_id in class_names.items():
+                count = int(counts.get(class_id, 0))
+                rows.append((int(class_id), str(class_name), count,
+                             count / max(len(dset), 1)))
+            rows.sort(key=lambda row: (-row[2], row[0]))
+            wandb.log({
+                f'{prefix}/{label_name}_num_classes': len(class_names),
+                f'{prefix}/{label_name}_num_present_classes':
+                int(sum(row[2] > 0 for row in rows)),
+            })
+            table = wandb.Table(columns=['class_id', 'class_name', 'count', 'frequency'],
+                                data=rows)
+            wandb.log({f'{prefix}/{label_name}_classes': table})
+            top_rows = rows[:topk]
+            if top_rows:
+                top_table = wandb.Table(columns=['class_name', 'count'],
+                                        data=[[row[1], row[2]] for row in top_rows])
+                wandb.log({
+                    f'{prefix}/{label_name}_top{topk}_distribution':
+                    wandb.plot.bar(top_table,
+                                   'class_name',
+                                   'count',
+                                   title=f'{split_name} {label_name} top-{topk}')
+                })
+
+
+def _load_training_checkpoint(model, optimizer, lr_scheduler, ckpt_path, logger):
+    checkpoint = torch.load(ckpt_path, map_location='cpu')
+    model_to_load = model.module if isinstance(
+        model, nn.parallel.DistributedDataParallel) else model
+    model_to_load.load_state_dict(checkpoint['model'])
+    if optimizer is not None and 'optimizer' in checkpoint:
+        optimizer.load_state_dict(checkpoint['optimizer'])
+    if lr_scheduler is not None and 'lr_scheduler' in checkpoint:
+        lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
+    logger.warning('Loaded model from %s (ep %f)', ckpt_path, checkpoint['epoch'])
+    return checkpoint
+
+
+def _clear_results_dir(results_dir):
+    os.makedirs(results_dir, exist_ok=True)
+    for fname in os.listdir(results_dir):
+        fpath = os.path.join(results_dir, fname)
+        if os.path.isdir(fpath):
+            shutil.rmtree(fpath)
+        else:
+            os.remove(fpath)
+
+
+def run_test_inference(train_eval_op, data_loader, logger, epoch, results_suffix='_test',
+                       store_endpoint='logits'):
+    logger.info('Running test inference for submission on suffix %s',
+                results_suffix)
+    this_save_dir = RESULTS_SAVE_DIR + results_suffix + '/'
+    logger.info('Clearing %s/%s', os.getcwd(), this_save_dir)
+    _clear_results_dir(this_save_dir)
+    for data in tqdm(data_loader, desc='Test inference'):
+        with torch.no_grad():
+            data = train_eval_op._basic_preproc(data, train_mode=False)
+            video = data['video'].to(train_eval_op.device, non_blocking=True)
+            target_shape = next(iter(data['target'].values())).shape
+            outputs, _ = train_eval_op.model(video, target_shape=target_shape)
+        all_logits = {
+            key: outputs[key].detach().cpu().numpy()
+            for key in outputs if key.startswith(store_endpoint)
+        }
+        all_logits.update({'idx': data['idx'].detach().cpu().numpy()})
+        uid_data = np.array(data['uid'])
+        if uid_data.dtype.kind == 'U':
+            assert int(uid_data.dtype.str[2:]) < STR_UID_MAXLEN, (
+                f'Make sure UID data is smaller than {STR_UID_MAXLEN}, or '
+                'update STR_UID_MAXLEN')
+            uid_data = uid_data.astype(f'S{STR_UID_MAXLEN}')
+        all_logits.update({'uid': uid_data})
+        all_logits.update({'epoch': np.array([epoch])})
+        store_append_h5(all_logits, this_save_dir)
+    return this_save_dir
+
+
+def _build_ek100_submission(results_dir, dataset, output_dir, sls):
+    results = _read_results_dir(results_dir)
+    logits = nb_utils.get_logits_from_results(results)
+    if isinstance(logits, dict):
+        action_scores = logits['logits/action']
+        verb_scores = logits.get('logits/verb')
+        noun_scores = logits.get('logits/noun')
+    else:
+        action_scores = logits
+        verb_scores = None
+        noun_scores = None
+    if verb_scores is None or noun_scores is None:
+        action_probs = _softmax_np(action_scores)
+        verb_scores = np.matmul(
+            action_probs, dataset.class_mappings[('verb', 'action')].numpy())
+        noun_scores = np.matmul(
+            action_probs, dataset.class_mappings[('noun', 'action')].numpy())
+    action_to_verb_noun = {
+        val: key for key, val in dataset.verb_noun_to_action.items()
+    }
+    uid_key = 'narration_id' if 'narration_id' in dataset.df.columns else 'uid'
+    output_results = {}
+    for row_idx, uid in enumerate(dataset.df[uid_key].values):
+        uid = str(uid)
+        top_100_actions = sorted(np.argpartition(action_scores[row_idx], -100)[-100:],
+                                 key=lambda x: -action_scores[row_idx][x])
+        output_results[uid] = {
+            'verb': {
+                f'{j}': float(score) for j, score in enumerate(verb_scores[row_idx])
+            },
+            'noun': {
+                f'{j}': float(score) for j, score in enumerate(noun_scores[row_idx])
+            },
+            'action': {
+                ','.join((str(el) for el in action_to_verb_noun[action_id])):
+                float(action_scores[row_idx][action_id])
+                for action_id in top_100_actions
+            }
+        }
+    if dataset.discarded_df is not None:
+        fallback_actions = sorted(action_to_verb_noun.keys())[:100]
+        for _, row in dataset.discarded_df.iterrows():
+            if str(row[uid_key]) in output_results:
+                continue
+            output_results[str(row[uid_key])] = {
+                'verb': {f'{j}': 0.0 for j in range(len(dataset.verb_classes))},
+                'noun': {f'{j}': 0.0 for j in range(len(dataset.noun_classes))},
+                'action': {
+                    ','.join((str(el) for el in action_to_verb_noun[action_id])): 0.0
+                    for action_id in fallback_actions
+                },
+            }
+    output_dict = {
+        'version': f'{dataset.version}',
+        'challenge': dataset.challenge_type,
+        'results': output_results,
+        'sls_pt': sls[0],
+        'sls_tl': sls[1],
+        'sls_td': sls[2],
+    }
+    os.makedirs(output_dir, exist_ok=True)
+    json_fpath = os.path.join(output_dir, 'test.json')
+    zip_fpath = os.path.join(output_dir, 'submit.zip')
+    with open(json_fpath, 'w') as fout:
+        import json
+        json.dump(output_dict, fout, indent=4)
+    with zipfile.ZipFile(zip_fpath, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.write(json_fpath, arcname='test.json')
+    return json_fpath, zip_fpath
+
+
+def _log_submission_artifact(json_fpath,
+                             zip_fpath,
+                             checkpoint_path=None,
+                             artifact_suffix=''):
+    if wandb.run is None:
+        return
+    artifact_name = f'{wandb.run.name}-submission'
+    if artifact_suffix:
+        artifact_name += f'-{artifact_suffix}'
+    artifact = wandb.Artifact(artifact_name, type='submission')
+    artifact.add_file(json_fpath, name='test.json')
+    artifact.add_file(zip_fpath, name='submit.zip')
+    if checkpoint_path is not None and os.path.exists(checkpoint_path):
+        artifact.add_file(checkpoint_path, name=os.path.basename(checkpoint_path))
+    wandb.log_artifact(artifact)
+
+
+def _get_submission_checkpoints(post_train_cfg):
+    checkpoints = post_train_cfg.submission.checkpoints
+    if checkpoints is None:
+        return ['best' if post_train_cfg.use_best_checkpoint else 'final']
+    if isinstance(checkpoints, str):
+        checkpoints = [checkpoints]
+    return list(checkpoints)
+
+
+def _submission_checkpoint_path(checkpoint_name):
+    if checkpoint_name == 'best':
+        return 'checkpoint_best.pth'
+    if checkpoint_name == 'final':
+        return CKPT_FNAME
+    return checkpoint_name
 
 
 def _compute_final_acc_from_stored(results_dir, dataset):
@@ -148,6 +397,7 @@ def train_one_epoch(
         # kwargs:
         print_freq,
         print_large_freq,
+        log_videos,
         grad_clip_params,
         loss_wts,  # All the loss wts go here
         save_freq: float,  # num epochs to save at. Could be fractional.
@@ -253,11 +503,12 @@ def train_one_epoch(
                            _get_memory_usage_gb(), step_id, print_freq,
                            metric_logger)
         # Store video logs for all videos (future, current etc)
-        [
-            _store_video_logs(data, key, step_id, print_large_freq,
-                              metric_logger) for key in data
-            if key.endswith('video')
-        ]
+        if log_videos:
+            [
+                _store_video_logs(data, key, step_id, print_large_freq,
+                                  metric_logger) for key in data
+                if key.endswith('video')
+            ]
         if not isinstance(lr_scheduler.base_scheduler,
                           scheduler.ReduceLROnPlateau):
             # If it is, then that is handled in the main training loop,
@@ -600,8 +851,19 @@ def main(cfg):
         get_dataset(getattr(cfg, el), cfg.data_eval, transform_eval, logger)
         for el in cfg.keys() if el.startswith(DATASET_EVAL_CFG_KEY)
     }
+    datasets_submit = {
+        el[len(DATASET_TEST_CFG_KEY):]:
+        get_dataset(getattr(cfg, el), cfg.data_eval, transform_eval, logger)
+        for el in cfg.keys() if el.startswith(DATASET_TEST_CFG_KEY)
+    }
 
     logger.info("Took %d", time.time() - st)
+    if cfg.wandb.log_dataset_stats:
+        _log_dataset_stats(dataset, 'train', topk=cfg.wandb.dataset_topk)
+        for key, val in datasets_test.items():
+            _log_dataset_stats(val, f'eval{key}', topk=cfg.wandb.dataset_topk)
+        for key, val in datasets_submit.items():
+            _log_dataset_stats(val, f'test{key}', topk=cfg.wandb.dataset_topk)
 
     logger.info("Creating data loaders")
     train_sampler = None
@@ -658,6 +920,18 @@ def main(cfg):
             collate_fn=collate_fn_remove_audio,
         )
         for key, val in datasets_test.items()
+    }
+    data_loaders_submit = {
+        key: torch.utils.data.DataLoader(
+            val,
+            batch_size=cfg.eval.batch_size or cfg.train.batch_size * 4,
+            sampler=None,
+            num_workers=cfg.data_eval.workers,
+            pin_memory=False,
+            shuffle=False,
+            collate_fn=collate_fn_remove_audio,
+        )
+        for key, val in datasets_submit.items()
     }
 
     num_classes = {key: len(val) for key, val in dataset.classes.items()}
@@ -762,14 +1036,12 @@ def main(cfg):
 
     last_saved_ckpt = CKPT_FNAME
     start_epoch = 0
+    best_acc1 = 0.0
     if os.path.isfile(last_saved_ckpt):
-        checkpoint = torch.load(last_saved_ckpt, map_location='cpu')
-        model.load_state_dict(checkpoint['model'])
-        optimizer.load_state_dict(checkpoint['optimizer'])
-        lr_scheduler.load_state_dict(checkpoint['lr_scheduler'])
+        checkpoint = _load_training_checkpoint(model, optimizer, lr_scheduler,
+                                               last_saved_ckpt, logger)
         start_epoch = checkpoint['epoch']
-        logger.warning('Loaded model from %s (ep %f)', last_saved_ckpt,
-                       start_epoch)
+        best_acc1 = checkpoint.get('best_acc1', 0.0)
 
     if dist_info['distributed'] and not cfg.eval.eval_fn.only_run_featext:
         # If only feat ext, then each gpu is going to test separately anyway,
@@ -778,7 +1050,8 @@ def main(cfg):
         model = torch.nn.parallel.DistributedDataParallel(
             model,
             device_ids=[dist_info['gpu']],
-            output_device=dist_info['gpu'])
+            output_device=dist_info['gpu'],
+            find_unused_parameters=cfg.ddp_find_unused_parameters)
     elif cfg.data_parallel:
         logger.info('Wrapping model into DP')
         device_ids = range(dist_info['world_size'])
@@ -804,7 +1077,6 @@ def main(cfg):
 
     # Get training metric logger
     stat_loggers = get_default_loggers(writer, start_epoch, logger)
-    best_acc1 = 0.0
     partial_epoch = start_epoch - int(start_epoch)
     start_epoch = int(start_epoch)
     last_saved_time = datetime.datetime(1, 1, 1, 0, 0)
@@ -819,8 +1091,6 @@ def main(cfg):
                                            stat_loggers["train"], logger,
                                            last_saved_time)
         partial_epoch = 0  # Reset, for future epochs
-        store_checkpoint([CKPT_FNAME], model, optimizer, lr_scheduler,
-                         epoch + 1)
         if cfg.train.eval_freq and epoch % cfg.train.eval_freq == 0:
             acc1 = hydra.utils.call(cfg.eval.eval_fn, train_eval_op,
                                     data_loaders_test, writer, logger,
@@ -828,9 +1098,16 @@ def main(cfg):
         else:
             acc1 = 0
         if cfg.train.store_best and acc1 >= best_acc1:
-            store_checkpoint('checkpoint_best.pth', model, optimizer,
-                             lr_scheduler, epoch + 1)
             best_acc1 = acc1
+            store_checkpoint('checkpoint_best.pth', model, optimizer,
+                             lr_scheduler, epoch + 1,
+                             extra_state={'best_acc1': best_acc1})
+        store_checkpoint([CKPT_FNAME],
+                         model,
+                         optimizer,
+                         lr_scheduler,
+                         epoch + 1,
+                         extra_state={'best_acc1': best_acc1})
 
         if isinstance(lr_scheduler.base_scheduler,
                       scheduler.ReduceLROnPlateau):
@@ -840,7 +1117,46 @@ def main(cfg):
         for log in stat_loggers:
             stat_loggers[log].reset_meters()
     # Store the final model to checkpoint
-    store_checkpoint([CKPT_FNAME], model, optimizer, lr_scheduler, epoch + 1)
+    store_checkpoint([CKPT_FNAME],
+                     model,
+                     optimizer,
+                     lr_scheduler,
+                     epoch + 1,
+                     extra_state={'best_acc1': best_acc1})
+
+    if (cfg.post_train.run_test_submission and len(data_loaders_submit) > 0
+            and utils.is_main_process()):
+        submit_dataset = datasets_submit[next(iter(datasets_submit.keys()))]
+        submit_loader = data_loaders_submit[next(iter(data_loaders_submit.keys()))]
+        for checkpoint_name in _get_submission_checkpoints(cfg.post_train):
+            checkpoint_name = str(checkpoint_name)
+            ckpt_to_use = _submission_checkpoint_path(checkpoint_name)
+            if not os.path.isfile(ckpt_to_use):
+                logger.warning('Skipping submission for %s: missing %s',
+                               checkpoint_name, ckpt_to_use)
+                continue
+            _load_training_checkpoint(model, optimizer=None, lr_scheduler=None,
+                                      ckpt_path=ckpt_to_use, logger=logger)
+            suffix = checkpoint_name.replace(os.sep, '_').replace('.', '_')
+            submit_results_dir = run_test_inference(
+                train_eval_op,
+                submit_loader,
+                logger,
+                epoch + 1,
+                results_suffix=f'{cfg.post_train.results_suffix}_{suffix}')
+            challenge_dir = os.path.join(os.getcwd(), 'challenge', suffix)
+            json_fpath, zip_fpath = _build_ek100_submission(
+                submit_results_dir,
+                submit_dataset,
+                challenge_dir,
+                cfg.post_train.submission.sls)
+            logger.info('Saved %s submission files to %s and %s',
+                        checkpoint_name, json_fpath, zip_fpath)
+            if cfg.post_train.log_test_artifact:
+                _log_submission_artifact(json_fpath,
+                                         zip_fpath,
+                                         ckpt_to_use,
+                                         artifact_suffix=suffix)
 
     total_time = time.time() - start_time
     total_time_str = str(datetime.timedelta(seconds=int(total_time)))

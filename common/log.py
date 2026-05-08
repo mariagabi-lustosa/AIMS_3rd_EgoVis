@@ -4,6 +4,9 @@ from collections import defaultdict, deque
 import datetime
 import time
 import logging
+import hashlib
+import json
+import os
 
 import torch
 import torch.distributed as dist
@@ -226,46 +229,94 @@ class MetricLogger(object):
     wandb.init(project=project_name)
     return WandbWriter()'''
 
-def setup_wandb(cfg=None, project_name="action-antecipation-experiments"):
-    #if not is_main_process():
-    #    return None
+def _get_default_wandb_run_name(cfg):
+    run_dir_name = os.path.basename(os.getcwd())
+    if run_dir_name not in ['', '.', os.path.sep]:
+        return run_dir_name
+    model_name = 'model'
+    try:
+        model_name = cfg.model.backbone['model_type']
+    except Exception:
+        try:
+            model_name = cfg.model.future_predictor._target_.split('.')[-1]
+        except Exception:
+            pass
+    now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    return f'{model_name}_{now}'
 
-    # 🔹 converter Hydra config → dict
+
+def _get_deterministic_wandb_run_id():
+    run_dir = os.path.abspath(os.getcwd())
+    return hashlib.md5(run_dir.encode('utf-8')).hexdigest()
+
+
+def setup_wandb(cfg=None, project_name="action-antecipation-experiments"):
+    if not is_main_process():
+        return None
+    if cfg is not None and hasattr(cfg, 'wandb') and not cfg.wandb.enabled:
+        return None
+
     config_dict = {}
     if cfg is not None:
         config_dict = OmegaConf.to_container(cfg, resolve=True)
 
-    # 🔹 pegar nome do modelo
-    model_name = "model"
-    try:
-        model_name = cfg.model.backbone['model_type']
-    except:
-        pass
+    wandb_cfg = getattr(cfg, 'wandb', None)
+    if wandb_cfg is None:
+        class _Tmp:
+            pass
+        wandb_cfg = _Tmp()
+        wandb_cfg.project_name = project_name
+        wandb_cfg.entity = None
+        wandb_cfg.run_name = None
+        wandb_cfg.group = None
+        wandb_cfg.tags = []
+        wandb_cfg.notes = None
+        wandb_cfg.save_code = False
+        wandb_cfg.auto_resume = True
+        wandb_cfg.resume_id = None
+        wandb_cfg.id_file = 'wandb_run.json'
 
-    # 🔹 timestamp
-    now = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+    run_meta_fpath = os.path.join(os.getcwd(), wandb_cfg.id_file)
+    run_meta = None
+    if wandb_cfg.auto_resume and os.path.exists(run_meta_fpath):
+        with open(run_meta_fpath, 'r') as fin:
+            run_meta = json.load(fin)
 
-    # 🔹 nome do run
-    run_name = f"{model_name}_{now}"
+    run_name = _get_default_wandb_run_name(cfg)
+    run_id = _get_deterministic_wandb_run_id()
+    if run_meta is not None:
+        stored_run_name = run_meta.get('name')
+        stored_run_id = run_meta.get('id')
+        if stored_run_name not in [None, run_name]:
+            logging.warning('Ignoring stored W&B run name %s in favor of '
+                            'current run dir name %s', stored_run_name,
+                            run_name)
+        if stored_run_id not in [None, run_id]:
+            logging.warning('Ignoring stored W&B run id %s in favor of '
+                            'deterministic id %s for run dir %s',
+                            stored_run_id, run_id, os.getcwd())
 
-    # 🔹 tags automáticas (baseadas no config)
-    tags = [
-        "AVT",
-        "EPIC-KITCHENS-100",
-        "BASELINE-AVT"
-    ]
+    wandb.init(project=wandb_cfg.project_name or project_name,
+               entity=wandb_cfg.entity,
+               id=run_id,
+               resume='allow' if wandb_cfg.auto_resume else None,
+               name=run_name,
+               group=wandb_cfg.group,
+               tags=list(wandb_cfg.tags),
+               notes=wandb_cfg.notes,
+               config=config_dict,
+               save_code=wandb_cfg.save_code)
 
-    # 🔹 descrição automática
-    notes = f"Treinamento do baseline (AVT)"
-
-    wandb.init(
-        project=project_name,
-        name=run_name,
-        tags=tags,
-        notes=notes,
-        config=config_dict,
-        save_code=False
-    )
+    with open(run_meta_fpath, 'w') as fout:
+        json.dump(
+            {
+                'id': wandb.run.id,
+                'name': wandb.run.name,
+                'project': wandb.run.project,
+                'url': wandb.run.url,
+            },
+            fout,
+            indent=2)
 
     return WandbWriter()
 

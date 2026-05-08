@@ -1,0 +1,20 @@
+# @package _group_
+
+_target_: models.future_prediction.VJEPAViTBFuturePredictor
+embed_dim: 768
+predictor_embed_dim: 384
+teacher_embed_dim: 1664
+depth: 12
+num_heads: 12
+output_len: 1
+max_len: 256
+num_mask_tokens: 8
+use_rope: false
+use_sdpa: false
+checkpoint_path: null
+checkpoint_url: https://dl.fbaipublicfiles.com/vjepa2/vjepa2_1_vitb_dist_vitG_384.pt
+load_pretrained_predictor: false
+future_pred_loss:
+  _target_: torch.nn.MSELoss
+freeze_input_projection: false
+freeze_all_but_last_n_blocks: 0

@@ -6,6 +6,7 @@ import subprocess
 import os
 import socket
 import glob
+import shlex
 from omegaconf import OmegaConf
 import inquirer
 import pathlib
@@ -284,7 +285,7 @@ def construct_cmd(args):
         cli += f' +hydra.launcher.partition="{args.partition}" '
     if args.debug:
         cli += (' data_train.workers=0 data_eval.workers=0 ')
-    cli += ' ' + ' '.join(args.rest)
+    cli += ' ' + ' '.join([shlex.quote(arg) for arg in args.rest])
     # This must go at the end, the other args must go before
     if not args.debug:
         cli += ' -m '

@@ -1,0 +1,460 @@
+_wandb:
+    value:
+        cli_version: 0.18.7
+        m: []
+        python_version: 3.7.7
+        t:
+            "1":
+                - 55
+            "2":
+                - 55
+            "3":
+                - 2
+                - 5
+                - 13
+                - 14
+                - 23
+                - 55
+                - 62
+            "4": 3.7.7
+            "5": 0.18.7
+            "8":
+                - 5
+            "12": 0.18.7
+            "13": linux-x86_64
+        visualize:
+            dataset_stats/eval/action_top20_distribution:
+                panel_config:
+                    fieldSettings:
+                        label: class_name
+                        value: count
+                    panelDefId: wandb/bar/v0
+                    stringSettings:
+                        title: eval action top-20
+                    transform:
+                        name: tableWithLeafColNames
+                    userQuery:
+                        queryFields:
+                            - args:
+                                - name: runSets
+                                  value: ${runSets}
+                              fields:
+                                - fields: []
+                                  name: id
+                                - fields: []
+                                  name: name
+                                - fields: []
+                                  name: _defaultColorIndex
+                                - args:
+                                    - name: tableKey
+                                      value: dataset_stats/eval/action_top20_distribution_table
+                                  fields: []
+                                  name: summaryTable
+                              name: runSets
+                panel_type: Vega2
+            dataset_stats/test/action_top20_distribution:
+                panel_config:
+                    fieldSettings:
+                        label: class_name
+                        value: count
+                    panelDefId: wandb/bar/v0
+                    stringSettings:
+                        title: test action top-20
+                    transform:
+                        name: tableWithLeafColNames
+                    userQuery:
+                        queryFields:
+                            - args:
+                                - name: runSets
+                                  value: ${runSets}
+                              fields:
+                                - fields: []
+                                  name: id
+                                - fields: []
+                                  name: name
+                                - fields: []
+                                  name: _defaultColorIndex
+                                - args:
+                                    - name: tableKey
+                                      value: dataset_stats/test/action_top20_distribution_table
+                                  fields: []
+                                  name: summaryTable
+                              name: runSets
+                panel_type: Vega2
+            dataset_stats/train/action_top20_distribution:
+                panel_config:
+                    fieldSettings:
+                        label: class_name
+                        value: count
+                    panelDefId: wandb/bar/v0
+                    stringSettings:
+                        title: train action top-20
+                    transform:
+                        name: tableWithLeafColNames
+                    userQuery:
+                        queryFields:
+                            - args:
+                                - name: runSets
+                                  value: ${runSets}
+                              fields:
+                                - fields: []
+                                  name: id
+                                - fields: []
+                                  name: name
+                                - fields: []
+                                  name: _defaultColorIndex
+                                - args:
+                                    - name: tableKey
+                                      value: dataset_stats/train/action_top20_distribution_table
+                                  fields: []
+                                  name: summaryTable
+                              name: runSets
+                panel_type: Vega2
+cwd:
+    value: /media/storage/alana/AVT
+data_eval:
+    value:
+        color_jitter_brightness: 0
+        color_jitter_contrast: 0
+        color_jitter_hue: 0
+        color_jitter_saturation: 0
+        crop_size: 112
+        eval_flip_crops: false
+        eval_num_crops: 1
+        flip_p: 0.5
+        frame_rate: 2
+        load_seg_labels: false
+        mean:
+            - 0.43216
+            - 0.394666
+            - 0.37645
+        num_frames: 16
+        reverse_channels: false
+        scale_h: 128
+        scale_pix_val: 1
+        scale_w: 174
+        std:
+            - 0.22803
+            - 0.22145
+            - 0.216989
+        subclips:
+            num_frames: 1
+            stride: 1
+        train_bs_multiplier: 5
+        use_dist_sampler: true
+        val_clips_per_video: 1
+        workers: 10
+data_parallel:
+    value: false
+data_train:
+    value:
+        color_jitter_brightness: 0
+        color_jitter_contrast: 0
+        color_jitter_hue: 0
+        color_jitter_saturation: 0
+        crop_size: 112
+        eval_flip_crops: false
+        eval_num_crops: 1
+        flip_p: 0.5
+        frame_rate: 2
+        load_seg_labels: false
+        mean:
+            - 0.43216
+            - 0.394666
+            - 0.37645
+        num_frames: 16
+        reverse_channels: false
+        scale_h: 128
+        scale_pix_val: 1
+        scale_w: 174
+        std:
+            - 0.22803
+            - 0.22145
+            - 0.216989
+        subclips:
+            num_frames: 1
+            stride: 1
+        train_bs_multiplier: 5
+        use_dist_sampler: true
+        val_clips_per_video: 1
+        workers: 10
+dataset:
+    value:
+        dundee50salads:
+            annot_reader_fn:
+                _target_: datasets.breakfast_50salads.read_orig_50salads_annotations
+                annots_dir: /media/storage/alana/AVT/DATA/videos/50Salads//activityAnnotations/
+                timestamps_dir: /media/storage/alana/AVT/DATA/videos/50Salads//timestamps/
+            common:
+                annots_dir: /media/storage/alana/AVT/DATA/videos/50Salads//activityAnnotations/
+                annots_dir_abu_farha: /media/storage/alana/AVT/external/breakfast_50salad_anticipation_annotations/annotations/50salads/groundTruth/
+                classes_fpath: /media/storage/alana/AVT/external/breakfast_50salad_anticipation_annotations/annotations/50salads/mapping.txt
+                data_dir: /media/storage/alana/AVT/DATA/videos/50Salads/
+                fold: 1
+                splits_dir: /media/storage/alana/AVT/external/breakfast_50salad_anticipation_annotations/cvpr18_data/50s_splits/
+                timestamps_dir: /media/storage/alana/AVT/DATA/videos/50Salads//timestamps/
+                videos_dir: /media/storage/alana/AVT/DATA/videos/50Salads//rgb/
+        egtea:
+            common:
+                label_type: action
+                modality: rgb
+                rulstm_annot_dir: /media/storage/alana/AVT/external/rulstm/RULSTM/data/egtea/
+                rulstm_feats_dir: /media/storage/alana/AVT/DATA/external/rulstm/RULSTM/egtea/
+                split: 1
+                tau_a: 1
+                tau_o: 2.5
+                version: -1
+        epic_kitchens:
+            common:
+                annot_dir: /media/storage/alana/AVT/external/epic-kitchens-55-annotations/
+                data_dir: /media/storage/alana/AVT/DATA/videos/EpicKitchens/videos_ht256px
+                label_type: action
+                rulstm_annot_dir: /media/storage/alana/AVT/external/rulstm/RULSTM/data/ek55/
+                rulstm_feats_dir: /media/storage/alana/AVT/DATA/external/rulstm/RULSTM/data_full/
+                tau_a: 1
+                tau_o: 2.5
+                version: 0.1
+        epic_kitchens100:
+            common:
+                annot_dir: /media/storage/alana/AVT/external/epic-kitchens-100-annotations/
+                data_dir_extension: /media/storage/alana/AVT/DATA/videos/EpicKitchens100/videos_extension_ht256px
+                label_type: action
+                rulstm_annot_dir: /media/storage/alana/AVT/external/rulstm/RULSTM/data/ek100/
+                rulstm_feats_dir: /media/storage/alana/AVT/DATA/external/rulstm/RULSTM/ek100_data_full/
+                tau_a: 1
+                tau_o: 2.5
+                version: 0.2
+dataset_eval:
+    value:
+        _target_: datasets.epic_kitchens.EPICKitchens
+        action_labels_fpath: /media/storage/alana/AVT/external/rulstm/RULSTM/data/ek100//actions.csv
+        annotation_dir: /media/storage/alana/AVT/external/epic-kitchens-100-annotations/
+        annotation_path:
+            - /media/storage/alana/AVT/external/epic-kitchens-100-annotations//EPIC_100_validation.pkl
+        conv_to_anticipate_fn:
+            _target_: datasets.base_video_dataset.convert_to_anticipation
+            drop_style: correct
+            tau_a: 1
+            tau_o: 10
+        label_type: action
+        reader_fn:
+            _target_: datasets.epic_kitchens.EpicRULSTMFeatsReader
+            lmdb_path: /media/storage/alana/AVT/DATA/external/rulstm/RULSTM/ek100_data_full//rgb_full/
+            read_type: normal
+        root:
+            - /media/storage/alana/AVT/DATA/videos/EpicKitchens/videos_ht256px/train
+            - /media/storage/alana/AVT/DATA/videos/EpicKitchens/videos_ht256px/test
+            - /media/storage/alana/AVT/DATA/videos/EpicKitchens100/videos_extension_ht256px
+        rulstm_annotation_dir: /media/storage/alana/AVT/external/rulstm/RULSTM/data/ek100/
+        sample_strategy: last_clip
+        version: 0.2
+dataset_test:
+    value:
+        _target_: datasets.epic_kitchens.EPICKitchens
+        action_labels_fpath: /media/storage/alana/AVT/external/rulstm/RULSTM/data/ek100//actions.csv
+        annotation_dir: /media/storage/alana/AVT/external/epic-kitchens-100-annotations/
+        annotation_path:
+            - /media/storage/alana/AVT/external/epic-kitchens-100-annotations//EPIC_100_test_timestamps.pkl
+        conv_to_anticipate_fn:
+            _target_: datasets.base_video_dataset.convert_to_anticipation
+            tau_a: 1
+            tau_o: 2.5
+        label_type: action
+        reader_fn:
+            _target_: datasets.epic_kitchens.EpicRULSTMFeatsReader
+            lmdb_path: /media/storage/alana/AVT/DATA/external/rulstm/RULSTM/ek100_data_full//rgb_full/
+            read_type: normal
+        root:
+            - /media/storage/alana/AVT/DATA/videos/EpicKitchens100/videos_extension_ht256px
+        rulstm_annotation_dir: /media/storage/alana/AVT/external/rulstm/RULSTM/data/ek100/
+        sample_strategy: center_clip
+        version: 0.2
+dataset_train:
+    value:
+        _target_: datasets.epic_kitchens.EPICKitchens
+        action_labels_fpath: /media/storage/alana/AVT/external/rulstm/RULSTM/data/ek100//actions.csv
+        annotation_dir: /media/storage/alana/AVT/external/epic-kitchens-100-annotations/
+        annotation_path:
+            - /media/storage/alana/AVT/external/epic-kitchens-100-annotations//EPIC_100_train.pkl
+        conv_to_anticipate_fn:
+            _target_: datasets.base_video_dataset.convert_to_anticipation
+            drop_style: correct
+            tau_a: 1
+            tau_o: 10
+        label_type: action
+        reader_fn:
+            _target_: datasets.epic_kitchens.EpicRULSTMFeatsReader
+            lmdb_path: /media/storage/alana/AVT/DATA/external/rulstm/RULSTM/ek100_data_full//rgb_full/
+            read_type: normal
+        root:
+            - /media/storage/alana/AVT/DATA/videos/EpicKitchens/videos_ht256px/train
+            - /media/storage/alana/AVT/DATA/videos/EpicKitchens/videos_ht256px/test
+            - /media/storage/alana/AVT/DATA/videos/EpicKitchens100/videos_extension_ht256px
+        rulstm_annotation_dir: /media/storage/alana/AVT/external/rulstm/RULSTM/data/ek100/
+        sample_strategy: last_clip
+        version: 0.2
+ddp_find_unused_parameters:
+    value: true
+dist_backend:
+    value: nccl
+eval:
+    value:
+        batch_size: 16
+        eval_fn:
+            _target_: func.train.evaluate
+            only_run_featext: false
+            store: true
+            store_endpoint: logits
+expt_name:
+    value: default
+moco:
+    value:
+        _target_: moco.moco.builder.MoCo
+        K: 65536
+        T: 0.2
+        dim: 128
+        m: 0.999
+        mlp: true
+model:
+    value:
+        add_regression_head: false
+        backbone:
+            _target_: torch.nn.Identity
+        backbone_dim: 1024
+        backbone_last_n_modules_to_drop: 2
+        bn:
+            eps: 0.001
+            mom: 0.1
+        classifier:
+            _target_: torch.nn.Linear
+            bias: true
+        classifier_on_past: false
+        dropout: 0.3
+        future_predictor:
+            _target_: models.future_prediction.VJEPAViTBFuturePredictor
+            checkpoint_path: /media/storage/alana/AVT/DATA/pretrained/vjepa2/vjepa2_1_vitb_dist_vitG_384.pt
+            checkpoint_url: https://dl.fbaipublicfiles.com/vjepa2/vjepa2_1_vitb_dist_vitG_384.pt
+            depth: 12
+            embed_dim: 768
+            freeze_all_but_last_n_blocks: 0
+            freeze_input_projection: false
+            future_pred_loss:
+                _target_: torch.nn.MSELoss
+            load_pretrained_predictor: true
+            max_len: 16
+            num_heads: 12
+            num_mask_tokens: 8
+            output_len: 1
+            predictor_embed_dim: 384
+            teacher_embed_dim: 1664
+            use_rope: false
+            use_sdpa: false
+        intermediate_featdim: null
+        project_dim_for_nce: null
+        same_temp_agg_dim: false
+        temporal_aggregator:
+            _target_: models.temporal_aggregation.Identity
+        temporal_aggregator_after_future_pred:
+            _target_: models.temporal_aggregation.Identity
+        use_cls_mappings: false
+opt:
+    value:
+        bias_bn_wd_scale: 1
+        classifier_only: false
+        grad_clip:
+            max_norm: null
+            norm_type: 2
+        lr_wd:
+            - - future_predictor
+              - 0.0001
+              - 1e-05
+            - - classifiers
+              - 0.0003
+              - 1e-05
+        optimizer:
+            _target_: torch.optim.AdamW
+        scale_lr_by_bs: false
+        scheduler:
+            _target_: common.scheduler.CosineLR
+            eta_min: 0
+            num_epochs: 45
+        warmup:
+            _target_: common.scheduler.Warmup
+            init_lr_ratio: 0
+            num_epochs: 5
+post_train:
+    value:
+        dataset_cfg_key: dataset_test
+        log_test_artifact: true
+        results_suffix: _test
+        run_test_submission: true
+        submission:
+            sls:
+                - 1
+                - 4
+                - 4
+        use_best_checkpoint: true
+pytorch:
+    value:
+        video_backend: video_reader
+run_id:
+    value: 0
+seed:
+    value: 42
+sync_bn:
+    value: false
+test_only:
+    value: false
+train:
+    value:
+        batch_size: 16
+        eval_freq: 1
+        fn: train
+        init_from_model: null
+        num_epochs: 50
+        shuffle_data: true
+        store_best: true
+        train_one_epoch_fn:
+            _target_: func.train.train_one_epoch
+            grad_clip_params:
+                max_norm: null
+                norm_type: 2
+            log_videos: false
+            loss_wts:
+                cls_action: 1
+                cls_noun: 1
+                cls_verb: 1
+                feat: 0.1
+                past_cls_action: 0
+                past_cls_noun: 0
+                past_cls_verb: 0
+                pred: 1
+            print_freq: 10
+            print_large_freq: 1000
+            save_freq: null
+            save_freq_min: 60
+            save_intermediates: false
+train_eval_op:
+    value:
+        _target_: func.train_eval_ops.Basic
+        cls_loss_acc_fn:
+            _target_: func.train_eval_ops.BasicLossAccuracy
+            balance_classes: false
+        reg_criterion:
+            _target_: torch.nn.MSELoss
+wandb:
+    value:
+        auto_resume: true
+        dataset_topk: 20
+        enabled: true
+        entity: null
+        group: null
+        id_file: wandb_run.json
+        log_dataset_stats: true
+        log_videos: false
+        notes: Treino exp14 com loss feat ativada e todos os parametros da V-JEPA liberados para treinamento com teste final e upload do JSON
+        project_name: action-antecipation-experiments
+        resume_id: null
+        run_name: null
+        save_code: false
+        tags: []

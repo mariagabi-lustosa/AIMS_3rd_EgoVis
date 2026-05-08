@@ -14,7 +14,7 @@ from common.utils import get_video_info
 
 # An abstract class to keep track of all reader type classes
 class Reader(nn.Module):
-    pass
+    needs_video_path = True
 
 
 class DefaultReader(Reader):

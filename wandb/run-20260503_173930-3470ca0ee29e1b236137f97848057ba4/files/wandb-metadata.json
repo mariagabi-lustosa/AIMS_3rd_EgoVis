@@ -1,0 +1,41 @@
+{
+  "os": "Linux-6.5.0-27-generic-x86_64-with-debian-bookworm-sid",
+  "python": "3.7.7",
+  "startedAt": "2026-05-03T20:39:30.276775Z",
+  "program": "<stdin>",
+  "git": {
+    "remote": "git@github.com:facebookresearch/AVT.git",
+    "commit": "9d5cc67b4533bab610a65ec64db276a480328d8f"
+  },
+  "email": "alana.stc@gmail.com",
+  "root": "/media/storage/alana/AVT",
+  "host": "turing",
+  "username": "iury",
+  "executable": "/home/iury/miniconda3/envs/avt/bin/python3",
+  "cpu_count": 16,
+  "cpu_count_logical": 24,
+  "gpu": "NVIDIA GeForce RTX 4090",
+  "gpu_count": 1,
+  "disk": {
+    "/": {
+      "total": "489475031040",
+      "used": "288515379200"
+    }
+  },
+  "memory": {
+    "total": "33442226176"
+  },
+  "cpu": {
+    "count": 16,
+    "countLogical": 24
+  },
+  "gpu_nvidia": [
+    {
+      "name": "NVIDIA GeForce RTX 4090",
+      "memoryTotal": "25757220864",
+      "cudaCores": 16384,
+      "architecture": "Ada"
+    }
+  ],
+  "cudaVersion": "12.4"
+}

@@ -920,6 +920,7 @@ def get_struct_outputs_per_dataset(run_infos,
         }
     # Add in all the discarded dfs with uniform distribution
     if dataset.discarded_df is not None:
+        fallback_actions = sorted(action_to_verb_noun.keys())[:100]
         for _, row in dataset.discarded_df.iterrows():
             if str(row[uid_key]) in results:
                 continue
@@ -930,8 +931,10 @@ def get_struct_outputs_per_dataset(run_infos,
                 'noun':
                 {f'{j}': 0.0
                  for j in range(len(dataset.noun_classes))},
-                'action': {f'0,{j}': 0.0
-                           for j in range(100)},
+                'action': {
+                    ','.join((str(el) for el in action_to_verb_noun[action_id])): 0.0
+                    for action_id in fallback_actions
+                },
             }
     output_dict = {
         'version': f'{dataset.version}',
