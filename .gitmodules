@@ -1,6 +1,0 @@
-[submodule "external/epic-kitchens-100-annotations"]
-	path = external/epic-kitchens-100-annotations
-	url = git@github.com:epic-kitchens/epic-kitchens-100-annotations.git
-[submodule "external/epic-kitchens-55-annotations"]
-	path = external/epic-kitchens-55-annotations
-	url = git@github.com:epic-kitchens/epic-kitchens-55-annotations.git
