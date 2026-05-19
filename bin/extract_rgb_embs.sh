@@ -14,6 +14,6 @@ source ~/miniconda3/bin/activate
 conda activate kitchens
 
 # Extracting RGB Embeddings
-python ~/github/AIMS_3rd_EgoVis/extract_embeddings.py \
+python ~/github/AIMS_3rd_EgoVis/src/preprocessing/extract_embeddings.py \
     --input_dir /hadatasets/EPIC-KITCHENS_rgb_crops \
     --cache_dir /home/lucas.ueda/github/AIMS_3rd_EgoVis/cache_models
