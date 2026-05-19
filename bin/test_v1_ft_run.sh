@@ -9,13 +9,18 @@
 #SBATCH --gres=gpu:1
 #SBATCH --mail-user=l156368@dac.unicamp.br
 #SBATCH --mail-type=BEGIN,END,FAIL
-#SBATCH --cpus-per-task=32
 
 # Load Miniconda and activate environment
 source ~/miniconda3/bin/activate
-conda activate kitchens_tmp  # Replace with your environment name
+conda activate kitchens  # Replace with your environment name
 
 
-python ~/github/AIMS_3rd_EgoVis/process_optical.py \
-    --rgb_dir    /hadatasets/EPIC-KITCHENS_rgb_crops \
-    --video_path /hadatasets/EPIC-KITCHENS_384
+python ~/github/AIMS_3rd_EgoVis/test.py \
+    --test_csv /hadatasets/EPIC-KITCHENS/EPIC_100_test_timestamps.csv \
+    --data_dir  /hadatasets/EPIC-KITCHENS_rgb_crops \
+    --model_path ./experiments/vjepa2_epic_ft \
+    --challenge action_anticipation \
+    --batch_size 1 \
+    --sls_pt 2 \
+    --sls_tl 1 \
+    --sls_td 1
